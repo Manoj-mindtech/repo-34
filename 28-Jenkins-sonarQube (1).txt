@@ -1,0 +1,177 @@
+Install Jenkins on CentOS 7/AMI Linux/
+
+sudo yum install epel-release 
+#sudo amazon-linux-extras install epel -y
+sudo yum update 
+
+sudo yum install java-1.8.0-openjdk
+sudo yum install java-1.8.0-openjdk-devel
+java -version
+
+#Environment Variables :
+
+sudo cp /etc/profile /etc/profile_backup 
+echo 'export JAVA_HOME=/usr/lib/jvm/jre-1.8.0-openjdk' | sudo tee -a /etc/profile 
+echo 'export JRE_HOME=/usr/lib/jvm/jre' | sudo tee -a /etc/profile 
+source /etc/profile 
+
+
+echo $JAVA_HOME 
+echo $JRE_HOME 
+
+sudo wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
+cd /etc/yum.repos.d
+ls
+cat jenkins.repo
+cd
+sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io.key 
+yum install jenkins 
+
+
+cat /etc/passwd
+
+#How to change Jenkins Port Number:
+
+/etc/sysconfig
+
+nano jenkins
+JENKINS_PORT=8090
+
+Adding different Versions of Maven .
+
+ManageJenkins > GlobalToolConfiguration > Add Maven
+
+ 1)maven:3.8.4
+
+ 2)maven:3.0
+
+Jenkins FreeStyle Job > Build > Add build step > Invoke top-level Maven Targets
+
+ Maven Version : Maven
+
+ Goals : clean package
+
+Build
+
+To observe the BuildResult & TestReports
+
+Jenkins Job > Workspace 
+
+	target > surefire-reports > Unit Testcase reports are in .txt and .xml format
+
+
+Configure Jenkins Job : (JUnit Plugin)
+
+ Go to PostbuildAction > Publish JUnit test result report
+
+ Test report XMLs : **/target/surefire-reports/*.xml
+
+ Save & Apply
+
+ Build Now
+
+----------------------------------------------------------
+
+@How to Get Reports on Jenkins Job Dashboard:
+
+Install : cobertura [cobertura coverage reports]
+
+Restarts the Jenkins Server
+
+Modify Maven Goals : clean package cobertura:cobertura -Dcobertura.report.format=xml
+
+Check in Jenkins-job >configuration > PostBuild Action
+
+Publish cobertura coverage reports
+
+**/target/site/cobertura/coverage.xml
+
+Apply & save
+
+=====================================================
+
+Sonarqube installation t2.medium (AMI Linux):
+================================
+
+sudo yum install epel-release 
+sudo amazon-linux-extras install epel
+sudo yum update 
+
+sudo yum install java-1.8.0-openjdk
+sudo yum install java-1.8.0-openjdk-devel
+java -version
+
+
+echo 'export JAVA_HOME=/usr/lib/jvm/jre-1.8.0-openjdk' | sudo tee -a /etc/profile 
+echo 'export JRE_HOME=/usr/lib/jvm/jre' | sudo tee -a /etc/profile 
+source /etc/profile 
+
+wget http://downloads.sourceforge.net/project/sonar-pkg/rpm/sonar.repo
+sudo mv sonar.repo /etc/yum.repos.d/sonar.repo
+
+sudo yum install sonar
+
+service sonar start
+
+service sonar status
+
+
+Open browser http://ip-address:9000
+
+
+Install "sonarqube scanner" plugin
+
+Configure Sonar in jenkins dashboard.
+
+Dashboard > configuration >sonarQubeServer
+
+Add SonarQube
+
+Name : sonarQube
+
+ServerURL : http://ip-address:9000
+
+Apply and Save
+
+#Download Scanner :
+
+GlobalToolConfiguration > SonarQubeScanner > Add SonarqubeScanner >
+
+Install Automatically .
+
+Go to sonarQube Terminal 
+
+ls
+cd /opt/sonar
+ls
+cd logs
+cat sonar.log
+
+-------------------------------
+Go to Jobconfiguration > Build > AddBuildstep > Execute SonarQubeScanner
+
+Analysis Properties :
+
+sonar.projectKey=HelloWorldServlet
+sonar.projectname=HelloWorldServlet
+sonar.projectversion=1.0
+sonar.sources=/var/lib/jenkins/workspace/Job-1
+#sonar.java.binaries=/var/lib/jenkins/workspace/Job-1/target/classes/
+sonar.java.binaries=/var/lib/jenkins/workspace/Job-1
+
+==================================================================================
+
+Create new Jenkins FreestyleJob :sonar-demo
+
+Git : https://github.com/shashikanth-t/GOL-Repo.git
+branch : devops
+
+Build > AddBuildstep > Execute SonarQubeScanner
+
+Analysis Properties :
+
+sonar.projectKey=sonar-demo
+sonar.projectname=sonar-demo
+sonar.projectversion=1.0
+sonar.sources=/var/lib/jenkins/workspace/sonar-demo
+sonar.java.binaries=/var/lib/jenkins/workspace/sonar-demo
