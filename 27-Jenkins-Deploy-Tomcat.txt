@@ -1,0 +1,174 @@
+
+ How to deploy artifact into tomcat webserver :
+ -------------------------------------------
+
+
+Step -1 : Launch Ec2 Instance (ubuntu 16.0)
+
+- Install Jenkins  and Maven
+
+1)Setup Jenkins Server
+
+	i)Launch EC2 instance ubuntu 16.04
+	
+	sudo apt-get update
+	sudo apt-get install openjdk-8-jdk -y
+	wget -q -O - https://pkg.jenkins.io/debian/jenkins.io.key | sudo apt-key add -
+	sudo sh -c 'echo deb http://pkg.jenkins.io/debian-stable binary/ > /etc/apt/sources.list.d/jenkins.list'
+	sudo apt-get update
+	sudo apt-key adv --keyserver hkp://pool.sks-keyservers.net:80 --recv-keys  9B7D32F2D50582E6
+	sudo apt-get update
+	sudo apt-get install jenkins 
+	
+	ssh-keygen
+	cd .ssh
+	ls
+	cat id_rsa.pub
+		copy text from here
+	nano authorized_keys
+		paste here
+	cd
+	sudo nano /etc/sudoers
+	 jenkins ALL=(ALL) NOPASSWD: ALL
+
+
+
+-Install Maven plugin and ssh-agent plugin
+
+#Install Maven in Jenkins Server
+----------------------------------
+	1.sudo add-apt-repository ppa:webupd8team/java
+	2.sudo apt-get update -y
+	3.sudo apt-get install oracle-java8-installer
+	4.java -version
+	5.cd /opt/
+	6. wget https://dlcdn.apache.org/maven/maven-3/3.8.5/binaries/apache-maven-3.8.5-bin.tar.gz
+	7.sudo tar -xvzf apache-maven-3.8.5-bin.tar.gz
+	8.sudo mv apache-maven-3.8.5 maven 
+	  export PATH=$PATH:/opt/maven/bin
+	--Set Up Environment Variables
+
+	9.sudo nano /etc/profile.d/mavenenv.sh
+
+	export M2_HOME=/opt/maven
+	export PATH=${M2_HOME}/bin:${PATH}
+	cd /etc/profile.d
+	10.sudo chmod +x /etc/profile.d/mavenenv.sh
+	11.source /etc/profile.d/mavenenv.sh
+	12.mvn --version
+-----------------------------------------------------------------------
+Jenkins > Manage Jenkins > Global ToolConfiguration >Maven Installation
+
+Add Maven 
+
+Name : apache-maven-3.8.5
+MAVEN_HOME	 : /opt/maven/apache-maven-3.8.5
+
+Jenkins > Manage Plugins > SSH agent > install without restart
+
+Install Deploy to container plugin
+-------------------------------------------------------------------------
+
+Step-2 : Launch Ec2 Instance (AMI Linux 2)
+#How to install tomcat server on 8.5 (link : https://acloudxpert.com/install-tomcat-on-amazon-linux/)
+-Install Tomcat 
+-Modify Port Number
+-Add Manger Credentials
+-----------------------------
+yum remove java* -y
+sudo yum install java-1.8.0-openjdk.x86_64 -y
+
+# create tomcat directory
+cd /opt
+wget https://dlcdn.apache.org/tomcat/tomcat-9/v9.0.62/bin/apache-tomcat-9.0.62.tar.gz
+tar zxf  apache-tomcat-9.0.62.tar.gz
+cd apache-tomcat-9.0.62
+cd bin
+chmod +x /opt/apache-tomcat-9.0.62/bin/startup.sh shutdown.sh
+
+ln -s /opt/apache-tomcat-9.0.62/bin/startup.sh /usr/local/bin/tomcatup
+ln -s /opt/apache-tomcat-9.0.62/bin/shutdown.sh /usr/local/bin/tomcatdown
+tomcatup
+
+http://<Public_IP>:8080
+--To change Tomcat Port Number 
+
+cd /opt/apache-tomcat-9.0.62/conf
+
+nano server.xml
+          <Connector port="8090" protocol="HTTP/1.1"   connectionTimeout="20000"  redirectPort="8443" />
+
+
+
+find / -name context.xml
+
+-- do same in manager,host-manager 
+
+vi /opt/apache-tomcat-9.0.59/webapps/manager/META-INF/context.xml
+
+ <!--  <Valve className="org.apache.catalina.valves.RemoteAddrValve"
+         allow="127\.\d+\.\d+\.\d+|::1|0:0:0:0:0:0:0:1" /> -->
+
+cd
+cd  /opt/apache-tomcat-9.0.62/conf
+nano tomcat-users.xml
+Update users information in the tomcat-users.xml file goto tomcat home directory and Add below users to conf/tomcat-user.xml file
+ <role rolename="manager-gui"/>
+ <role rolename="manager-script"/>
+ <role rolename="manager-jmx"/>
+ <role rolename="manager-status"/>
+ <user username="admin" password="admin" roles="manager-gui, manager-script, manager-jmx, manager-status"/>
+ <user username="deployer" password="deployer" roles="manager-script"/>
+ <user username="tomcat" password="tomcat1" roles="manager-gui"/>
+
+
+ cd  /opt/apache-tomcat-8.5.35/bin
+ ./shutdown.sh
+./startup.sh
+
+Open Browser 
+http://<Public_IP>:8090
+manager login credentials : tomcat/s3cret
+
+
+--------terminal---------
+sudo su - 
+cd /opt/apache-tomcat-8.5.35/bin
+ps -ef | grep tomcat
+./shutdown.sh
+ps -ef | grep tomcat
+./startup.sh
+ps -ef | grep tomcat
+
+ chown -R ec2-user:ec2-user /opt
+-----------------------------
+
+Step-3 : Create Maven Project (Job-1)
+
+-Add Git Url (https://github.com/shashikanth-t/mwebrepo.git)
+-add Maven goals : clean install package
+
+
+Step-4 : 
+
+-Manage plugin > Deploy to container 
+-Set the tomcat  credentials 
+-Manage Jenkins > Manage Credentials > Global Credentials  :- deployer/deployer 
+
+-Configure the Job-1
+-Post-build Actions : Deploy war/ear to a container 
+  
+   WAR/EAR files : **/*.war
+   context path : 
+   Container : Tomcat 8.x
+				Credentials	: deployer/deployer
+				Tomcat URL : http://3.219.215.97:8090/
+				Apply & Save
+
+-Build the Job
+
+Step-5
+
+Poll SCM : */2 * * * *
+
+Modify index.jsp in GIT Repo
